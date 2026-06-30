@@ -1,46 +1,45 @@
-import openai
-import json
 import os
+import json
+from groq import Groq
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
 async def generate_sentence(word: str, level: str = "beginner") -> dict:
     level_info = {
-        "beginner": "A1-A2 level, simple present tense, basic vocabulary, maximum 8 words",
-        "intermediate": "B1-B2 level, mix of tenses, maximum 12 words",
-        "advanced": "C1 level, complex structures, idioms, maximum 15 words"
+        "beginner": "A1-A2, very simple, present tense, max 8 words",
+        "intermediate": "B1-B2, mix of tenses, max 12 words",
+        "advanced": "C1, complex structures, idioms, max 15 words"
     }
 
-    prompt = f"""Create an English example sentence using the word "{word}".
-
+    prompt = f"""Create an English example sentence for the word "{word}".
 Level: {level_info.get(level, level_info['beginner'])}
 
-Reply in JSON format ONLY:
+Respond ONLY in valid JSON (no markdown, no explanation):
 {{
-    "sentence": "the English sentence",
+    "sentence": "English sentence using the word",
     "translation": "Persian (Farsi) translation",
-    "word_type": "part of speech",
-    "pronunciation": "IPA phonetic transcription",
-    "explanation": "brief explanation in Persian"
+    "word_type": "part of speech (noun/verb/adj/adv)",
+    "pronunciation": "IPA like /əˈpæl/",
+    "explanation": "short explanation in Persian"
 }}"""
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
             messages=[
-                {"role": "system", "content": "You are an English teacher for Persian speakers. Always reply with valid JSON only."},
+                {"role": "system", "content": "You are a helpful English teacher. Always respond with valid JSON only, no markdown."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=300
+            max_tokens=500
         )
         content = response.choices[0].message.content.strip()
         if content.startswith("```"):
-            content = content.split("")[1]
+            content = content.split("```")[1]
             if content.startswith("json"):
                 content = content[4:]
-            content = content.strip().rstrip("").strip()
+            content = content.strip().rstrip("`").strip()
         return json.loads(content)
     except Exception as e:
         print(f"Error: {e}")
@@ -54,25 +53,43 @@ Reply in JSON format ONLY:
 
 
 async def generate_quiz(word: str, sentence: str) -> dict:
-    prompt = f"""Create a multiple choice quiz for the English word "{word}" used in: "{sentence}"
+    prompt = f"""Create a multiple choice quiz for "{word}" used in: "{sentence}"
 
-Create 4 options where ONLY ONE is correct.
-
-Reply in JSON format ONLY:
+Respond ONLY in valid JSON (no markdown):
 {{
     "question": "question in Persian",
     "question_en": "question in English",
-    "options": ["option 1", "option 2", "option 3", "option 4"],
+    "options": ["A) text", "B) text", "C) text", "D) text"],
     "correct_index": 0,
-    "explanation": "why this is correct, in Persian"
+    "explanation": "why in Persian"
 }}"""
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
             messages=[
-                {"role": "system", "content": "You are an English teacher. Always reply with valid JSON only."},
+                {"role": "system", "content": "You are a helpful English teacher. Always respond with valid JSON only, no markdown."},
                 {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=400
+        )
+        content = response.choices[0].message.content.strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+            content = content.strip().rstrip("`").strip()
+        return json.loads(content)
+    except Exception as e:
+        print(f"Error: {e}")
+        return {
+            "question": f"معنی '{word}' چیست؟",
+            "question_en": f"What does '{word}' mean?",
+            "options": ["A) option 1", "B) option 2", "C) option 3", "D) option 4"],
+            "correct_index": 0,
+            "explanation": "خطا در ساخت کوئیز."
+        }                {"role": "user", "content": prompt}
             ],
             temperature=0.7,
             max_tokens=300
